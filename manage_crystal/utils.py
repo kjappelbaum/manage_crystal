@@ -1,4 +1,15 @@
-import re
+from __future__ import absolute_import
 
-def strip_uncertainity(data): 
-  return float(re.sub(r'\([^)]*\)', '', data)
+
+def is_number(s):  #checks if a string is a number or not
+    try:
+        float(s)
+        return True
+    except ValueError:
+        pass
+    try:
+        import unicodedata
+        unicodedata.numeric(s)
+        return True
+    except (TypeError, ValueError):
+        pass
