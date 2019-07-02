@@ -4,11 +4,12 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from manage_crystal import Crys
+from manage_crystal.utils import strip_uncertainity
 from manage_crystal.periodic_table import ptab_atnum_inv
 import numpy as np
 import os
 import sys
-import re 
+import re
 from six.moves import range
 
 ANGS2BOHR = 1.88973
@@ -20,7 +21,7 @@ def parse_from_filepath(filepath, tm):
     if not os.path.isfile(filepath):
         sys.exit("ERROR: The file %s doesn't exist!" % filepath)
     inputformat = os.path.splitext(filepath)[1][1:]
-    file = open(filepath, 'r')
+    file = open(filepath, "r")
     if inputformat in ["axsf", "xsf"]:
         crys = parse_axsf(file)
     elif inputformat == "cif":
@@ -48,17 +49,17 @@ def parse_from_filepath(filepath, tm):
 
 
 def parse_axsf(file):
-    ''' Parse .axsf and .xsf files and return a Crys object '''
+    """ Parse .axsf and .xsf files and return a Crys object """
     c = Crys()
     while True:
-        if file.readline().split()[0] == 'PRIMVEC':
+        if file.readline().split()[0] == "PRIMVEC":
             break
     for i in range(3):
         data = file.readline().split()
         for j in range(3):
             c.matrix[i][j] = data[j]
     while True:
-        if file.readline().split()[0] == 'PRIMCOORD':
+        if file.readline().split()[0] == "PRIMCOORD":
             break
     c.natom = int(file.readline().split()[0])
     for i in range(c.natom):
@@ -74,7 +75,7 @@ def parse_axsf(file):
 
 
 def parse_cif(file):
-    ''' Parse .cif file and return a Crys object '''
+    """ Parse .cif file and return a Crys object """
     # REQUIREMENTS:
     # - only valid for P1 symmetry
     # - cell data should be specified before the atom data
@@ -87,36 +88,34 @@ def parse_cif(file):
         if line == "":
             break
         if len(data) > 0 and (data[0] == "_cell_length_a"):
-            c.length[0] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.length[0] = strip_uncertainity(data[1])
         if len(data) > 0 and (data[0] == "_cell_length_b"):
-            c.length[1] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.length[1] = strip_uncertainity(data[1])
         if len(data) > 0 and (data[0] == "_cell_length_c"):
-            c.length[2] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.length[2] = strip_uncertainity(data[1])
         if len(data) > 0 and (data[0] == "_cell_angle_alpha"):
-            c.angle_deg[0] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.angle_deg[0] = strip_uncertainity(data[1])
         if len(data) > 0 and (data[0] == "_cell_angle_beta"):
-            c.angle_deg[1] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.angle_deg[1] = strip_uncertainity(data[1])
         if len(data) > 0 and (data[0] == "_cell_angle_gamma"):
-            c.angle_deg[2] = float(re.sub(r'\([^)]*\)', '', data[1]))
+            c.angle_deg[2] = strip_uncertainity(data[1])
         # if the "_atom_site_***" section starts, remember the order
-        if len(data) > 0 \
-           and len(data[0].split("_")) > 1 \
-           and data[0].split("_")[1] == "atom":
+        if (
+            len(data) > 0
+            and len(data[0].split("_")) > 1
+            and data[0].split("_")[1] == "atom"
+        ):
             data_order_dic = {}
             order = 0
-            while len(data[0].split("_")) > 1 \
-                  and data[0].split("_")[1] == "atom":
+            while len(data[0].split("_")) > 1 and data[0].split("_")[1] == "atom":
                 data_order_dic[data[0]] = order
                 line = file.readline()
                 data = line.split()
                 order += 1
-            break  #go in the loop to read coordinates
+            break  # go in the loop to read coordinates
     # Read atomic element, coordinates and charges
     while True:
-        if line == "" \
-           or line =="\n" \
-           or data[0] == "loop_" \
-           or data[0] == "_loop":
+        if line == "" or line == "\n" or data[0] == "loop_" or data[0] == "_loop":
             break
         # looks for "type_symbol" before and, if missing for "label"
         if "_atom_site_type_symbol" in data_order_dic:
@@ -126,29 +125,32 @@ def parse_cif(file):
         else:
             sys.exit("EXIT: in cif missing type_symbol and label")
         if "_atom_site_fract_x" in data_order_dic:
-            c.atom_fract.append([
-                float(data[data_order_dic["_atom_site_fract_x"]]),
-                float(data[data_order_dic["_atom_site_fract_y"]]),
-                float(data[data_order_dic["_atom_site_fract_z"]]),
-            ])
+            c.atom_fract.append(
+                [
+                    strip_uncertainity(data[data_order_dic["_atom_site_fract_x"]]),
+                    strip_uncertainity(data[data_order_dic["_atom_site_fract_y"]]),
+                    strip_uncertainity(data[data_order_dic["_atom_site_fract_z"]]),
+                ]
+            )
         elif "_atom_site_Cartn_x" in data_order_dic:
-            c.atom_xyz.append([
-                float(data[data_order_dic["_atom_site_Cartn_x"]]),
-                float(data[data_order_dic["_atom_site_Cartn_y"]]),
-                float(data[data_order_dic["_atom_site_Cartn_z"]]),
-            ])
+            c.atom_xyz.append(
+                [
+                    strip_uncertainity(data[data_order_dic["_atom_site_Cartn_x"]]),
+                    strip_uncertainity(data[data_order_dic["_atom_site_Cartn_y"]]),
+                    strip_uncertainity(data[data_order_dic["_atom_site_Cartn_z"]]),
+                ]
+            )
         else:
             sys.exit("EXIT: in cif missing fract_ and Cartn_ coordinates")
         if "_atom_site_charge" in data_order_dic:
-            c.atom_charge.append(
-                float(data[data_order_dic["_atom_site_charge"]]))
+            c.atom_charge.append(float(data[data_order_dic["_atom_site_charge"]]))
         line = file.readline()
         data = line.split()
     return c
 
 
 def parse_cp2k(file):
-    ''' Parse any CP2K input file and return a Crys object '''
+    """ Parse any CP2K input file and return a Crys object """
     c = Crys()
     while True:
         data = file.readline().split()
@@ -164,34 +166,26 @@ def parse_cp2k(file):
                 c.matrix[cell_dict[data[0]]][i] = float(data[1 + i + shift])
         if len(data) > 0 and (data[0] == "&COORD"):
             break
-    scaled_coord = False  #Default
+    scaled_coord = False  # Default
     while True:
         data = file.readline().split()
-        if data[0] == "SCALED" \
-         and data[1].lower() in ["t", "true", ".true."]:
+        if data[0] == "SCALED" and data[1].lower() in ["t", "true", ".true."]:
             scaled_coord = True
-        elif data[0] == "SCALED" \
-         and data[1].lower() in ["f", "false", ".false."]:
+        elif data[0] == "SCALED" and data[1].lower() in ["f", "false", ".false."]:
             scaled_coord = False
         elif data[0] == "&END":  # End of &COORD section
             break
         elif len(data) > 0:
             c.atom_type.append(data[0])
             if scaled_coord:
-                c.atom_fract.append(
-                    [float(data[1]),
-                     float(data[2]),
-                     float(data[3])])
+                c.atom_fract.append([float(data[1]), float(data[2]), float(data[3])])
             else:
-                c.atom_xyz.append(
-                    [float(data[1]),
-                     float(data[2]),
-                     float(data[3])])
+                c.atom_xyz.append([float(data[1]), float(data[2]), float(data[3])])
     return c
 
 
 def parse_cssr(file):
-    ''' Parse .cssr file and return a Crys object '''
+    """ Parse .cssr file and return a Crys object """
     # File format description: http://www.chem.cmu.edu/courses/09-560/docs/msi/modenv/D_Files.html#944777
     c = Crys()
     data = file.readline().split()
@@ -210,10 +204,10 @@ def parse_cssr(file):
 
 
 def parse_cube(file):
-    ''' Parse .cube file and return a Crys object '''
+    """ Parse .cube file and return a Crys object """
     c = Crys()
-    junk = file.readline()  #header1
-    junk = file.readline()  #header2
+    junk = file.readline()  # header1
+    junk = file.readline()  # header2
     data = file.readline().split()
     c.natom = int(data[0])
     for i in range(3):
@@ -224,36 +218,58 @@ def parse_cube(file):
         data = file.readline().split()
         # convert from atomic number to element
         c.atom_type.append(ptab_atnum_inv[int(data[0])])
-        c.atom_xyz.append([
-            float(data[2]) / ANGS2BOHR,
-            float(data[3]) / ANGS2BOHR,
-            float(data[4]) / ANGS2BOHR
-        ])
+        c.atom_xyz.append(
+            [
+                float(data[2]) / ANGS2BOHR,
+                float(data[3]) / ANGS2BOHR,
+                float(data[4]) / ANGS2BOHR,
+            ]
+        )
     return c
 
 
 def parse_dcd_header(file):
-    ''' Parse the dcd header '''
-    data_dtype = np.dtype([('h01', 'i4', 1), ('h02', 'S4', 1), ('h03', 'i4',
-                                                                9),
-                           ('h04', 'f4', 1), ('h05', 'i4', 10), ('h06', 'i4',
-                                                                 1),
-                           ('h07', 'i4', 1), ('h08', 'i4', 1),
-                           ('h09', 'S80', 1), ('h10', 'S80', 1),
-                           ('h11', 'i4', 1), ('h12', 'i4', 1),
-                           ('natoms', 'i4', 1), ('h13', 'i4', 1)])
+    """ Parse the dcd header """
+    data_dtype = np.dtype(
+        [
+            ("h01", "i4", 1),
+            ("h02", "S4", 1),
+            ("h03", "i4", 9),
+            ("h04", "f4", 1),
+            ("h05", "i4", 10),
+            ("h06", "i4", 1),
+            ("h07", "i4", 1),
+            ("h08", "i4", 1),
+            ("h09", "S80", 1),
+            ("h10", "S80", 1),
+            ("h11", "i4", 1),
+            ("h12", "i4", 1),
+            ("natoms", "i4", 1),
+            ("h13", "i4", 1),
+        ]
+    )
     data = np.fromfile(file, data_dtype, 1)
     return data
 
 
 def parse_dcd_snapshot(file, c):
-    ''' Parse the dcd snapshot, updatyng the Crys cell and coordinates '''
-    data_dtype = np.dtype([('junk1', 'i4', 1), ('len_ang', 'f8', 6),
-                           ('junk2', 'i4', 1), ('junk3', 'i4', 1),
-                           ('coord_x', 'f4', c.natom), ('junk4', 'i4', 1),
-                           ('junk5', 'i4', 1), ('coord_y', 'f4', c.natom),
-                           ('junk6', 'i4', 1), ('junk7', 'i4', 1),
-                           ('coord_z', 'f4', c.natom), ('junk8', 'i4', 1)])
+    """ Parse the dcd snapshot, updatyng the Crys cell and coordinates """
+    data_dtype = np.dtype(
+        [
+            ("junk1", "i4", 1),
+            ("len_ang", "f8", 6),
+            ("junk2", "i4", 1),
+            ("junk3", "i4", 1),
+            ("coord_x", "f4", c.natom),
+            ("junk4", "i4", 1),
+            ("junk5", "i4", 1),
+            ("coord_y", "f4", c.natom),
+            ("junk6", "i4", 1),
+            ("junk7", "i4", 1),
+            ("coord_z", "f4", c.natom),
+            ("junk8", "i4", 1),
+        ]
+    )
     data = np.fromfile(file, data_dtype, 1)
     if len(data) == 0:
         EOF = True
@@ -262,53 +278,44 @@ def parse_dcd_snapshot(file, c):
         # Clear data to avoid conflicts
         c.clear_cell_and_coord()
         # Parsing the cell (be carefull to the order!)
-        c.length[0] = data['len_ang'][0][0]
-        c.length[1] = data['len_ang'][0][2]
-        c.length[2] = data['len_ang'][0][5]
-        c.angle_deg[0] = data['len_ang'][0][4]
-        c.angle_deg[1] = data['len_ang'][0][3]
-        c.angle_deg[2] = data['len_ang'][0][1]
+        c.length[0] = data["len_ang"][0][0]
+        c.length[1] = data["len_ang"][0][2]
+        c.length[2] = data["len_ang"][0][5]
+        c.angle_deg[0] = data["len_ang"][0][4]
+        c.angle_deg[1] = data["len_ang"][0][3]
+        c.angle_deg[2] = data["len_ang"][0][1]
         # Reset the coordinates and store the new ones
         c.atom_xyz = [[0.0] * 3 for i in range(c.natom)]
         for iatom in range(c.natom):
-            c.atom_xyz[iatom][0] = data['coord_x'][0][iatom]
-            c.atom_xyz[iatom][1] = data['coord_y'][0][iatom]
-            c.atom_xyz[iatom][2] = data['coord_z'][0][iatom]
+            c.atom_xyz[iatom][0] = data["coord_x"][0][iatom]
+            c.atom_xyz[iatom][1] = data["coord_y"][0][iatom]
+            c.atom_xyz[iatom][2] = data["coord_z"][0][iatom]
     return EOF
 
 
 def parse_pdb(file):
-    ''' Parse .pdb file and return Crys object '''
+    """ Parse .pdb file and return Crys object """
     c = Crys()
     while True:
         line = file.readline()
         data = line.split()
         if line == "":
             break
-        elif len(data) > 0 and (data[0] == 'END' or data[0] == 'ENDMDL'):
+        elif len(data) > 0 and (data[0] == "END" or data[0] == "ENDMDL"):
             break
-        elif len(data) > 0 and data[0] == 'CRYST1':
-            c.length = [
-                float(line[0o6:15]),
-                float(line[15:24]),
-                float(line[24:33])
-            ]
-            c.angle_deg = [
-                float(line[33:40]),
-                float(line[40:47]),
-                float(line[47:54])
-            ]
+        elif len(data) > 0 and data[0] == "CRYST1":
+            c.length = [float(line[0o6:15]), float(line[15:24]), float(line[24:33])]
+            c.angle_deg = [float(line[33:40]), float(line[40:47]), float(line[47:54])]
         elif len(data) > 0 and (data[0] == "ATOM" or data[0] == "HETATM"):
-            c.atom_type.append(data[2])  #maybe read to data[-1]
+            c.atom_type.append(data[2])  # maybe read to data[-1]
             c.atom_xyz.append(
-                [float(line[30:38]),
-                 float(line[38:46]),
-                 float(line[46:54])])
+                [float(line[30:38]), float(line[38:46]), float(line[46:54])]
+            )
     return c
 
 
 def parse_poscar(file):
-    ''' Parse Vasp's POSCAR file and return a Crys object '''
+    """ Parse Vasp's POSCAR file and return a Crys object """
     c = Crys()
     junk_title = file.readline()
     junk_symm = file.readline()
@@ -323,14 +330,11 @@ def parse_poscar(file):
             c.atom_type.append(poscar_atomtypes[i])
     c.natom = len(c.atom_type)
     coord_type = file.readline().split()[0]
-    if coord_type.lower() == 'direct':
+    if coord_type.lower() == "direct":
         for i in range(c.natom):
             data = file.readline().split()
-            c.atom_fract.append(
-                [float(data[0]),
-                 float(data[1]),
-                 float(data[2])])
-    elif coord_type.lower() == 'cartesian':
+            c.atom_fract.append([float(data[0]), float(data[1]), float(data[2])])
+    elif coord_type.lower() == "cartesian":
         for i in range(c.natom):
             data = file.readline().split()
             c.atom_xyz.append([float(data[0]), float(data[1]), float(data[2])])
@@ -338,7 +342,7 @@ def parse_poscar(file):
 
 
 def parse_pwo(file):
-    ''' Parse Quantum Espresso's .pwo and .pwi files and return Crys object '''
+    """ Parse Quantum Espresso's .pwo and .pwi files and return Crys object """
     c = Crys()
     # Parse cell:
     # search for the last time the cell/coord are printed and jump to that
@@ -346,17 +350,17 @@ def parse_pwo(file):
     # initial input cell
     with file as myFile:
         for num, line in enumerate(myFile, 1):
-            if 'CELL_PARAMETERS' in line:
+            if "CELL_PARAMETERS" in line:
                 cell_line = num
     file.seek(0)
-    if 'cell_line' in locals():  #read cell in vc-relax calculation
+    if "cell_line" in locals():  # read cell in vc-relax calculation
         for i in range(0, cell_line):
-            skip = file.readline()  #title line
+            skip = file.readline()  # title line
         for i in range(3):
             data = file.readline().split()
             for j in range(3):
                 c.matrix[i][j] = float(data[j])
-    else:  #read cell in scf or relax calculation
+    else:  # read cell in scf or relax calculation
         while True:
             data = file.readline().split()
             if len(data) > 0 and (data[0] == "celldm(1)="):
@@ -373,36 +377,30 @@ def parse_pwo(file):
     # Parse atomic coordinates
     with file as myFile:
         for num, line in enumerate(myFile, 1):
-            if 'ATOMIC_POSITIONS' in line:
+            if "ATOMIC_POSITIONS" in line:
                 atomicpositions_line = num
-                if line.split()[1] == 'angstrom' \
-                 or line.split()[1] == '(angstrom)':
+                if line.split()[1] == "angstrom" or line.split()[1] == "(angstrom)":
                     readfractional = False
-                elif line.split()[1] == 'crystal' \
-                 or line.split()[1] == '(crystal)':
+                elif line.split()[1] == "crystal" or line.split()[1] == "(crystal)":
                     readfractional = True
     file.seek(0)
-    if 'atomicpositions_line' in locals():  #read atomic in vc-relax and relax.
+    if "atomicpositions_line" in locals():  # read atomic in vc-relax and relax.
         for i in range(0, atomicpositions_line):
             skip = file.readline()
         i = 0
         while True:
             data = file.readline().split()
-            if len(data) < 4:  #if the coordinates are finished, break
+            if len(data) < 4:  # if the coordinates are finished, break
                 break
             else:
                 c.atom_type.append(data[0])
                 if readfractional:
                     c.atom_fract.append(
-                        [float(data[1]),
-                         float(data[2]),
-                         float(data[3])])
+                        [float(data[1]), float(data[2]), float(data[3])]
+                    )
                 else:
-                    c.atom_xyz.append(
-                        [float(data[1]),
-                         float(data[2]),
-                         float(data[3])])
-    else:  #read atomic in scf calculation
+                    c.atom_xyz.append([float(data[1]), float(data[2]), float(data[3])])
+    else:  # read atomic in scf calculation
         while True:
             data = file.readline().split()
             if len(data) > 0 and (data[0] == "celldm(1)="):
@@ -410,31 +408,30 @@ def parse_pwo(file):
             if len(data) > 3 and (data[3] == "positions"):
                 while True:
                     data = file.readline().split()
-                    if len(data) < 10:  #if the file is finished stop
+                    if len(data) < 10:  # if the file is finished stop
                         break
                     else:
                         c.atom_type.append(data[1])
                         c.atom_xyz.append(
-                            [float(data[6]),
-                             float(data[7]),
-                             float(data[8])])
+                            [float(data[6]), float(data[7]), float(data[8])]
+                        )
                 break
     return c
 
 
 def parse_xyz(file):
-    ''' Parse .xyz file and return Crys object '''
+    """ Parse .xyz file and return Crys object """
     c = Crys()
     c.natom = int(file.readline().split()[0])
     data = file.readline().split()
-    if len(data) >= 7 and data[0] == 'CELL:':
+    if len(data) >= 7 and data[0] == "CELL:":
         c.length = [float(data[1]), float(data[2]), float(data[3])]
         c.angle_deg = [float(data[4]), float(data[5]), float(data[6])]
-    elif len(data) >= 10 and data[0] == 'cell:':
+    elif len(data) >= 10 and data[0] == "cell:":
         c.matrix[0] = [float(data[1]), float(data[2]), float(data[3])]
         c.matrix[1] = [float(data[4]), float(data[5]), float(data[6])]
         c.matrix[2] = [float(data[7]), float(data[8]), float(data[9])]
-    elif len(data) >= 23 and data[0] == 'jmolscript:':
+    elif len(data) >= 23 and data[0] == "jmolscript:":
         c.matrix[0] = [float(data[10]), float(data[11]), float(data[12])]
         c.matrix[1] = [float(data[15]), float(data[16]), float(data[17])]
         c.matrix[2] = [float(data[20]), float(data[21]), float(data[22])]
@@ -448,9 +445,9 @@ def parse_xyz(file):
 
 
 def parse_xyz_tm3(file):
-    ''' Parse .xyz file (tailor made #3) and return Crys object '''
+    """ Parse .xyz file (tailor made #3) and return Crys object """
     c = Crys()
-    junk = file.readline()  #the first line has the filename
+    junk = file.readline()  # the first line has the filename
     data = file.readline().split()
     c.length = [float(data[1]), float(data[2]), float(data[3])]
     ac.angle_deg = [float(data[4]), float(data[5]), float(data[6])]
