@@ -92,6 +92,8 @@ def parse_mol_coords(coord_l: list):
     charges = []
     for line in coord_l:
         splitted = line.split()
+        if len(splitted) < 3:
+            break
         x.append(float(splitted[1]))
         y.append(float(splitted[2]))
         z.append(float(splitted[3]))
@@ -137,9 +139,8 @@ def parse_mol(file):
     _coord[:, 1] = y
     _coord[:, 2] = z
     if coord_type == "Cartesian":
-
         c.atom_xyz = _coord.tolist()
-        print(c.atom_xyz)
+
     else:
         c.atom_fract = _coord.tolist()
 
